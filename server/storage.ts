@@ -71,17 +71,22 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByDiscordId(discordId: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.discordId === discordId);
+    for (const user of this.users.values()) {
+      if (user.discordId === discordId) {
+        return user;
+      }
+    }
+    return undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
     const user: User = { 
-      ...insertUser, 
-      id, 
-      createdAt: new Date() 
+      id: this.currentUserId++,
+      ...insertUser,
+      avatar: insertUser.avatar ?? null,
+      createdAt: new Date()
     };
-    this.users.set(id, user);
+    this.users.set(user.id, user);
     return user;
   }
 
@@ -103,18 +108,26 @@ export class MemStorage implements IStorage {
   }
 
   async getBotByBotId(botId: string): Promise<Bot | undefined> {
-    return Array.from(this.bots.values()).find(bot => bot.botId === botId);
+    for (const bot of this.bots.values()) {
+      if (bot.botId === botId) {
+        return bot;
+      }
+    }
+    return undefined;
   }
 
   async createBot(insertBot: InsertBot): Promise<Bot> {
-    const id = this.currentBotId++;
     const bot: Bot = { 
-      ...insertBot, 
-      id, 
-      createdAt: new Date(),
-      lastSeen: new Date()
+      id: this.currentBotId++,
+      ...insertBot,
+      avatar: insertBot.avatar ?? null,
+      isOnline: insertBot.isOnline ?? false,
+      serverCount: insertBot.serverCount ?? 0,
+      commandCount: insertBot.commandCount ?? 0,
+      lastSeen: null,
+      createdAt: new Date()
     };
-    this.bots.set(id, bot);
+    this.bots.set(bot.id, bot);
     return bot;
   }
 
@@ -140,13 +153,14 @@ export class MemStorage implements IStorage {
   }
 
   async createCommand(insertCommand: InsertCommand): Promise<Command> {
-    const id = this.currentCommandId++;
     const command: Command = { 
-      ...insertCommand, 
-      id, 
-      createdAt: new Date() 
+      id: this.currentCommandId++,
+      ...insertCommand,
+      usage: insertCommand.usage ?? 0,
+      isActive: insertCommand.isActive ?? true,
+      createdAt: new Date()
     };
-    this.commands.set(id, command);
+    this.commands.set(command.id, command);
     return command;
   }
 
@@ -165,27 +179,26 @@ export class MemStorage implements IStorage {
 
   async getActivitiesByUserId(userId: number, limit: number = 10): Promise<ActivityWithBot[]> {
     const userBots = await this.getBotsByUserId(userId);
-    const userBotIds = userBots.map(bot => bot.id);
+    const userBotIds = new Set(userBots.map(bot => bot.id));
     
-    const userActivities = Array.from(this.activities.values())
-      .filter(activity => userBotIds.includes(activity.botId))
+    const activities = Array.from(this.activities.values())
+      .filter(activity => userBotIds.has(activity.botId))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
 
-    return userActivities.map(activity => {
-      const bot = userBots.find(b => b.id === activity.botId)!;
-      return { ...activity, bot };
-    });
+    return activities.map(activity => ({
+      ...activity,
+      bot: this.bots.get(activity.botId)!
+    }));
   }
 
   async createActivity(insertActivity: InsertActivity): Promise<Activity> {
-    const id = this.currentActivityId++;
     const activity: Activity = { 
-      ...insertActivity, 
-      id, 
-      createdAt: new Date() 
+      id: this.currentActivityId++,
+      ...insertActivity,
+      createdAt: new Date()
     };
-    this.activities.set(id, activity);
+    this.activities.set(activity.id, activity);
     return activity;
   }
 
@@ -211,6 +224,46 @@ export class MemStorage implements IStorage {
       uptime: "99.8%"
     };
   }
+
+  // Stub methods for collaboration (MemStorage doesn't support collaboration)
+  async getBotCollaborators(botId: number): Promise<CollaboratorWithUser[]> {
+    return [];
+  }
+
+  async getBotsUserCanAccess(userId: number): Promise<BotWithCollaborators[]> {
+    const userBots = await this.getBotsByUserId(userId);
+    return userBots.map(bot => ({
+      ...bot,
+      collaborators: [],
+      userRole: "owner"
+    }));
+  }
+
+  async inviteCollaborator(insertCollaborator: InsertCollaborator): Promise<Collaborator> {
+    throw new Error("Collaboration not supported in MemStorage");
+  }
+
+  async acceptCollaboratorInvite(collaboratorId: number): Promise<Collaborator | undefined> {
+    throw new Error("Collaboration not supported in MemStorage");
+  }
+
+  async removeCollaborator(collaboratorId: number): Promise<boolean> {
+    throw new Error("Collaboration not supported in MemStorage");
+  }
+
+  async updateCollaboratorRole(collaboratorId: number, role: string): Promise<Collaborator | undefined> {
+    throw new Error("Collaboration not supported in MemStorage");
+  }
+
+  async getUserRole(userId: number, botId: number): Promise<string | null> {
+    const bot = await this.getBot(botId);
+    return bot?.userId === userId ? "owner" : null;
+  }
+
+  async canUserAccessBot(userId: number, botId: number, requiredRole?: string): Promise<boolean> {
+    const bot = await this.getBot(botId);
+    return bot?.userId === userId;
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -227,7 +280,7 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values({ ...insertUser, avatar: insertUser.avatar || null })
+      .values(insertUser)
       .returning();
     return user;
   }
@@ -258,13 +311,7 @@ export class DatabaseStorage implements IStorage {
   async createBot(insertBot: InsertBot): Promise<Bot> {
     const [bot] = await db
       .insert(bots)
-      .values({
-        ...insertBot,
-        avatar: insertBot.avatar || null,
-        isOnline: insertBot.isOnline ?? false,
-        serverCount: insertBot.serverCount ?? 0,
-        commandCount: insertBot.commandCount ?? 0
-      })
+      .values(insertBot)
       .returning();
     return bot;
   }
@@ -280,7 +327,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBot(id: number): Promise<boolean> {
     const result = await db.delete(bots).where(eq(bots.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async getCommandsByBotId(botId: number): Promise<Command[]> {
@@ -295,11 +342,7 @@ export class DatabaseStorage implements IStorage {
   async createCommand(insertCommand: InsertCommand): Promise<Command> {
     const [command] = await db
       .insert(commands)
-      .values({
-        ...insertCommand,
-        usage: insertCommand.usage ?? 0,
-        isActive: insertCommand.isActive ?? true
-      })
+      .values(insertCommand)
       .returning();
     return command;
   }
@@ -315,10 +358,15 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCommand(id: number): Promise<boolean> {
     const result = await db.delete(commands).where(eq(commands.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async getActivitiesByUserId(userId: number, limit: number = 10): Promise<ActivityWithBot[]> {
+    const userBots = await this.getBotsUserCanAccess(userId);
+    const userBotIds = userBots.map(bot => bot.id);
+    
+    if (userBotIds.length === 0) return [];
+
     const result = await db
       .select({
         activity: activities,
@@ -326,11 +374,14 @@ export class DatabaseStorage implements IStorage {
       })
       .from(activities)
       .innerJoin(bots, eq(activities.botId, bots.id))
-      .where(eq(bots.userId, userId))
+      .where(or(...userBotIds.map(id => eq(activities.botId, id))))
       .orderBy(activities.createdAt)
       .limit(limit);
 
-    return result.map(({ activity, bot }) => ({ ...activity, bot }));
+    return result.map(({ activity, bot }) => ({
+      ...activity,
+      bot
+    }));
   }
 
   async createActivity(insertActivity: InsertActivity): Promise<Activity> {
@@ -349,7 +400,7 @@ export class DatabaseStorage implements IStorage {
     totalCommands: number;
     uptime: string;
   }> {
-    const userBots = await this.getBotsByUserId(userId);
+    const userBots = await this.getBotsUserCanAccess(userId);
     const onlineBots = userBots.filter(bot => bot.isOnline).length;
     const totalServers = userBots.reduce((sum, bot) => sum + bot.serverCount, 0);
     const totalCommands = userBots.reduce((sum, bot) => sum + bot.commandCount, 0);

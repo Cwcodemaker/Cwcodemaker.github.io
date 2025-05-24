@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertBotSchema, insertCommandSchema, insertActivitySchema } from "@shared/schema";
+import { insertBotSchema, insertCommandSchema, insertActivitySchema, insertCollaboratorSchema } from "@shared/schema";
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || "";
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || "";
@@ -306,6 +306,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const activities = await storage.getActivitiesByUserId(userId, 10);
     res.json(activities);
+  });
+
+  // Collaboration endpoints
+  
+  // Get bot collaborators
+  app.get("/api/bots/:botId/collaborators", async (req, res) => {
+    const userId = (req as any).session?.userId;
+    const botId = parseInt(req.params.botId);
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    // Check if user can access this bot
+    const canAccess = await storage.canUserAccessBot(userId, botId, "viewer");
+    if (!canAccess) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const collaborators = await storage.getBotCollaborators(botId);
+      res.json(collaborators);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Invite collaborator
+  app.post("/api/bots/:botId/collaborators", async (req, res) => {
+    const userId = (req as any).session?.userId;
+    const botId = parseInt(req.params.botId);
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    // Check if user can manage this bot (admin or owner only)
+    const canManage = await storage.canUserAccessBot(userId, botId, "admin");
+    if (!canManage) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      // Find user by Discord username
+      const targetUser = await storage.getUserByDiscordId(req.body.discordId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const validatedData = insertCollaboratorSchema.parse({
+        botId,
+        userId: targetUser.id,
+        role: req.body.role,
+        invitedBy: userId,
+        status: "pending"
+      });
+
+      const collaborator = await storage.inviteCollaborator(validatedData);
+      res.json(collaborator);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Accept collaboration invite
+  app.put("/api/collaborators/:collaboratorId/accept", async (req, res) => {
+    const userId = (req as any).session?.userId;
+    const collaboratorId = parseInt(req.params.collaboratorId);
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const collaborator = await storage.acceptCollaboratorInvite(collaboratorId);
+      if (!collaborator) {
+        return res.status(404).json({ message: "Invitation not found" });
+      }
+      res.json(collaborator);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update collaborator role
+  app.put("/api/collaborators/:collaboratorId/role", async (req, res) => {
+    const userId = (req as any).session?.userId;
+    const collaboratorId = parseInt(req.params.collaboratorId);
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const collaborator = await storage.updateCollaboratorRole(collaboratorId, req.body.role);
+      if (!collaborator) {
+        return res.status(404).json({ message: "Collaborator not found" });
+      }
+      res.json(collaborator);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove collaborator
+  app.delete("/api/collaborators/:collaboratorId", async (req, res) => {
+    const userId = (req as any).session?.userId;
+    const collaboratorId = parseInt(req.params.collaboratorId);
+    
+    if (!userId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const success = await storage.removeCollaborator(collaboratorId);
+      if (!success) {
+        return res.status(404).json({ message: "Collaborator not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   return httpServer;
