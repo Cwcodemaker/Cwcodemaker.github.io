@@ -289,7 +289,7 @@ export function BotCodeEditor({ bot, onSave }: BotCodeEditorProps) {
                 <CardDescription className="text-[#b9bbbe]">
                   Bot with slash commands, embeds, and moderation features
                 </CardDescription>
-              </CardContent>
+              </CardHeader>
               <CardContent>
                 <Button 
                   onClick={() => {
