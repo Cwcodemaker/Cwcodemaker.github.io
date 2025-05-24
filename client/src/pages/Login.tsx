@@ -24,10 +24,8 @@ export default function Login() {
 
   const devLogin = useMutation({
     mutationFn: async (password: string) => {
-      return apiRequest("/api/auth/dev-login", {
-        method: "POST",
-        body: JSON.stringify({ password }),
-      });
+      const response = await apiRequest("POST", "/api/auth/dev-login", { password });
+      return response.json();
     },
     onSuccess: () => {
       toast({
