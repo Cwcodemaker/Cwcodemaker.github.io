@@ -169,6 +169,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: "Logged out successfully" });
   });
 
+  // Developer bypass login
+  app.post("/api/auth/dev-login", async (req, res) => {
+    const { password } = req.body;
+    
+    if (password !== "1234") {
+      return res.status(401).json({ message: "Invalid developer password" });
+    }
+
+    try {
+      // Create or get the developer user
+      let user = await storage.getUserByDiscordId("dev-user-12345");
+      
+      if (!user) {
+        user = await storage.createUser({
+          discordId: "dev-user-12345",
+          username: "Developer",
+          discriminator: "0001",
+          avatar: null,
+          accessToken: "dev-token",
+          refreshToken: "dev-refresh-token"
+        });
+      }
+
+      // Set session
+      (req as any).session.userId = user.id;
+      
+      res.json({ 
+        message: "Developer login successful",
+        user: {
+          id: user.id,
+          username: user.username,
+          discriminator: user.discriminator,
+          avatar: user.avatar
+        }
+      });
+    } catch (error) {
+      console.error("Developer login error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Bot management routes
   app.get("/api/bots", async (req, res) => {
     const userId = (req as any).session?.userId;

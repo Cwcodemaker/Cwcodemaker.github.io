@@ -1,18 +1,48 @@
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Bot, Shield, Zap, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Bot, Shield, Zap, Users, Code } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 import { getDiscordAuthUrl } from "@/lib/discord";
+import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const [devPassword, setDevPassword] = useState("");
+  const { toast } = useToast();
 
   // Check if user is already authenticated
   const { data: user } = useQuery({
     queryKey: ["/api/auth/me"],
     retry: false,
+  });
+
+  const devLogin = useMutation({
+    mutationFn: async (password: string) => {
+      return apiRequest("/api/auth/dev-login", {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Developer login successful",
+        description: "Welcome to DB 14!",
+      });
+      setLocation("/dashboard");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Invalid password",
+        description: "Please check your developer password and try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -23,6 +53,12 @@ export default function Login() {
 
   const handleDiscordLogin = () => {
     window.location.href = getDiscordAuthUrl();
+  };
+
+  const handleDevLogin = () => {
+    if (devPassword.trim()) {
+      devLogin.mutate(devPassword);
+    }
   };
 
   const features = [
@@ -99,6 +135,44 @@ export default function Login() {
                 </svg>
                 Login with Discord
               </Button>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full bg-[#4f545c]" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-[#2f3136] px-3 text-[#b9bbbe]">Or</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="text-xs text-orange-400 border-orange-400">
+                    <Code className="w-3 h-3 mr-1" />
+                    DEV
+                  </Badge>
+                  <span className="text-sm text-[#b9bbbe]">Developer Bypass</span>
+                </div>
+                <div className="space-y-2">
+                  <Input
+                    type="password"
+                    placeholder="Enter developer password (1234)..."
+                    value={devPassword}
+                    onChange={(e) => setDevPassword(e.target.value)}
+                    className="bg-[#40444b] border-[#4f545c] text-white placeholder-[#72767d]"
+                    onKeyDown={(e) => e.key === "Enter" && handleDevLogin()}
+                  />
+                  <Button 
+                    onClick={handleDevLogin}
+                    disabled={!devPassword.trim() || devLogin.isPending}
+                    variant="outline"
+                    className="w-full border-[#4f545c] text-[#b9bbbe] hover:bg-[#40444b]"
+                    size="sm"
+                  >
+                    {devLogin.isPending ? "Logging in..." : "Developer Login"}
+                  </Button>
+                </div>
+              </div>
 
               <p className="text-xs text-[#b9bbbe] text-center">
                 By logging in, you agree to connect your Discord account and allow bot management permissions.
