@@ -44,7 +44,7 @@ export function Navigation({ user, onMenuClick }: NavigationProps) {
             <div className="w-8 h-8 bg-[#5865f2] rounded-lg flex items-center justify-center">
               <Bot className="h-4 w-4 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-white">BotForge</h1>
+            <h1 className="text-xl font-bold text-white">DB 14</h1>
           </div>
         </div>
         

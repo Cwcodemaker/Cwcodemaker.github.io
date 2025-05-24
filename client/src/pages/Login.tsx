@@ -57,7 +57,7 @@ export default function Login() {
               <Bot className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">BotForge</h1>
+          <h1 className="text-4xl font-bold text-white mb-2">DB 14</h1>
           <p className="text-[#b9bbbe] text-lg">Discord Bot Management Platform</p>
         </div>
 
