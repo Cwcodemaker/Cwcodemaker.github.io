@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Plus } from "lucide-react";
+import { RefreshCw, Plus, Code, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { Navigation } from "@/components/Navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { DashboardStats } from "@/components/DashboardStats";
 import { BotList } from "@/components/BotList";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { CommandTable } from "@/components/CommandTable";
+import { BotCodeEditor } from "@/components/BotCodeEditor";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { apiRequest } from "@/lib/queryClient";
 import type { User, Bot, ActivityWithBot, Command } from "@shared/schema";
@@ -30,6 +32,7 @@ interface DashboardData {
 
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [location] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
