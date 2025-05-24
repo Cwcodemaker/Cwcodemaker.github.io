@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 11% 98%;
+  --foreground: 224 64% 13%;
+  --muted: 216 16% 94%;
+  --muted-foreground: 215 12% 48%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 64% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 64% 13%;
+  --border: 216 16% 88%;
+  --input: 216 16% 88%;
+  --primary: 221 83% 53%; /* Discord blurple */
+  --primary-foreground: 0 0% 98%;
+  --secondary: 216 16% 94%;
+  --secondary-foreground: 224 64% 13%;
+  --accent: 216 16% 94%;
+  --accent-foreground: 224 64% 13%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 221 83% 53%;
+  --radius: 0.5rem;
+  
+  /* Discord-specific colors */
+  --discord-blurple: 235 86% 65%; /* #5865F2 */
+  --discord-dark: 223 7% 21%; /* #36393f */
+  --discord-darker: 225 6% 19%; /* #2f3136 */
+  --discord-surface: 223 7% 26%; /* #40444b */
+  --discord-muted: 220 6% 72%; /* #b9bbbe */
+  --discord-success: 139 47% 68%; /* #57f287 */
+  --discord-warning: 48 100% 67%; /* #fee75c */
+  --discord-error: 359 82% 58%; /* #ed4245 */
+
+  /* Sidebar colors */
+  --sidebar-background: 225 6% 19%; /* #2f3136 */
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-primary: 235 86% 65%; /* #5865F2 */
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 223 7% 26%; /* #40444b */
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-border: 223 7% 26%; /* #40444b */
+  --sidebar-ring: 221 83% 53%;
+}
+
+.dark {
+  --background: 225 6% 19%; /* #2f3136 */
+  --foreground: 0 0% 98%;
+  --muted: 223 7% 26%; /* #40444b */
+  --muted-foreground: 220 6% 72%; /* #b9bbbe */
+  --popover: 225 6% 19%; /* #2f3136 */
+  --popover-foreground: 0 0% 98%;
+  --card: 223 7% 26%; /* #40444b */
+  --card-foreground: 0 0% 98%;
+  --border: 223 7% 26%; /* #40444b */
+  --input: 223 7% 26%; /* #40444b */
+  --primary: 235 86% 65%; /* #5865F2 */
+  --primary-foreground: 0 0% 98%;
+  --secondary: 223 7% 26%; /* #40444b */
+  --secondary-foreground: 0 0% 98%;
+  --accent: 223 7% 26%; /* #40444b */
+  --accent-foreground: 0 0% 98%;
+  --destructive: 359 82% 58%; /* #ed4245 */
+  --destructive-foreground: 0 0% 98%;
+  --ring: 221 83% 53%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Discord-inspired scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--discord-darker));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--discord-surface));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--discord-muted));
+  }
+}
+
+@layer components {
+  .sidebar-transition {
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .card-hover {
+    transition: all 0.2s ease-in-out;
+  }
+
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  }
+
+  .status-online {
+    box-shadow: 0 0 10px rgba(87, 242, 135, 0.3);
+  }
+
+  .status-offline {
+    box-shadow: 0 0 10px rgba(237, 66, 69, 0.3);
+  }
+
+  .bot-card {
+    background: linear-gradient(135deg, hsl(var(--discord-surface)) 0%, hsl(var(--discord-darker)) 100%);
+  }
+}
