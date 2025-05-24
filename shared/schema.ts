@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -85,3 +86,31 @@ export type BotWithCommands = Bot & {
 export type ActivityWithBot = Activity & {
   bot: Bot;
 };
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  bots: many(bots),
+}));
+
+export const botsRelations = relations(bots, ({ one, many }) => ({
+  user: one(users, {
+    fields: [bots.userId],
+    references: [users.id],
+  }),
+  commands: many(commands),
+  activities: many(activities),
+}));
+
+export const commandsRelations = relations(commands, ({ one }) => ({
+  bot: one(bots, {
+    fields: [commands.botId],
+    references: [bots.id],
+  }),
+}));
+
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  bot: one(bots, {
+    fields: [activities.botId],
+    references: [bots.id],
+  }),
+}));
