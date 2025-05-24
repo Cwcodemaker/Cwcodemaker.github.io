@@ -1,12 +1,13 @@
 import { 
-  users, bots, commands, activities,
+  users, bots, commands, activities, collaborators,
   type User, type InsertUser,
-  type Bot, type InsertBot, type BotWithCommands,
+  type Bot, type InsertBot, type BotWithCommands, type BotWithCollaborators,
   type Command, type InsertCommand,
-  type Activity, type InsertActivity, type ActivityWithBot
+  type Activity, type InsertActivity, type ActivityWithBot,
+  type Collaborator, type InsertCollaborator, type CollaboratorWithUser
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -43,6 +44,16 @@ export interface IStorage {
     totalCommands: number;
     uptime: string;
   }>;
+
+  // Collaboration operations
+  getBotCollaborators(botId: number): Promise<CollaboratorWithUser[]>;
+  getBotsUserCanAccess(userId: number): Promise<BotWithCollaborators[]>;
+  inviteCollaborator(collaboration: InsertCollaborator): Promise<Collaborator>;
+  acceptCollaboratorInvite(collaboratorId: number): Promise<Collaborator | undefined>;
+  removeCollaborator(collaboratorId: number): Promise<boolean>;
+  updateCollaboratorRole(collaboratorId: number, role: string): Promise<Collaborator | undefined>;
+  getUserRole(userId: number, botId: number): Promise<string | null>;
+  canUserAccessBot(userId: number, botId: number, requiredRole?: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -351,6 +362,138 @@ export class DatabaseStorage implements IStorage {
       totalCommands,
       uptime: "99.8%"
     };
+  }
+
+  async getBotCollaborators(botId: number): Promise<CollaboratorWithUser[]> {
+    const result = await db
+      .select({
+        collaborator: collaborators,
+        user: users,
+        invitedByUser: {
+          id: users.id,
+          username: users.username,
+          avatar: users.avatar,
+          discriminator: users.discriminator,
+        }
+      })
+      .from(collaborators)
+      .innerJoin(users, eq(collaborators.userId, users.id))
+      .innerJoin(
+        { invitedBy: users }, 
+        eq(collaborators.invitedBy, users.id)
+      )
+      .where(eq(collaborators.botId, botId));
+
+    return result.map(({ collaborator, user, invitedByUser }) => ({
+      ...collaborator,
+      user,
+      invitedByUser: invitedByUser as User
+    }));
+  }
+
+  async getBotsUserCanAccess(userId: number): Promise<BotWithCollaborators[]> {
+    // Get bots owned by user
+    const ownedBots = await db.select().from(bots).where(eq(bots.userId, userId));
+    
+    // Get bots user collaborates on
+    const collaboratedBots = await db
+      .select({ bot: bots })
+      .from(collaborators)
+      .innerJoin(bots, eq(collaborators.botId, bots.id))
+      .where(and(
+        eq(collaborators.userId, userId),
+        eq(collaborators.status, "accepted")
+      ));
+
+    const allBots = [
+      ...ownedBots.map(bot => ({ ...bot, userRole: "owner" })),
+      ...collaboratedBots.map(({ bot }) => ({ ...bot, userRole: undefined }))
+    ];
+
+    // Get collaborators for each bot
+    const botsWithCollaborators = await Promise.all(
+      allBots.map(async (bot) => {
+        const collaboratorsList = await this.getBotCollaborators(bot.id);
+        const userCollaboration = collaboratorsList.find(c => c.userId === userId);
+        
+        return {
+          ...bot,
+          collaborators: collaboratorsList,
+          userRole: bot.userRole || userCollaboration?.role || "owner"
+        };
+      })
+    );
+
+    return botsWithCollaborators;
+  }
+
+  async inviteCollaborator(insertCollaborator: InsertCollaborator): Promise<Collaborator> {
+    const [collaborator] = await db
+      .insert(collaborators)
+      .values(insertCollaborator)
+      .returning();
+    return collaborator;
+  }
+
+  async acceptCollaboratorInvite(collaboratorId: number): Promise<Collaborator | undefined> {
+    const [collaborator] = await db
+      .update(collaborators)
+      .set({ 
+        status: "accepted",
+        acceptedAt: new Date()
+      })
+      .where(eq(collaborators.id, collaboratorId))
+      .returning();
+    return collaborator || undefined;
+  }
+
+  async removeCollaborator(collaboratorId: number): Promise<boolean> {
+    const result = await db.delete(collaborators).where(eq(collaborators.id, collaboratorId));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async updateCollaboratorRole(collaboratorId: number, role: string): Promise<Collaborator | undefined> {
+    const [collaborator] = await db
+      .update(collaborators)
+      .set({ role })
+      .where(eq(collaborators.id, collaboratorId))
+      .returning();
+    return collaborator || undefined;
+  }
+
+  async getUserRole(userId: number, botId: number): Promise<string | null> {
+    // Check if user is the owner
+    const [bot] = await db.select().from(bots).where(and(
+      eq(bots.id, botId),
+      eq(bots.userId, userId)
+    ));
+    
+    if (bot) return "owner";
+
+    // Check if user is a collaborator
+    const [collaborator] = await db
+      .select()
+      .from(collaborators)
+      .where(and(
+        eq(collaborators.botId, botId),
+        eq(collaborators.userId, userId),
+        eq(collaborators.status, "accepted")
+      ));
+
+    return collaborator?.role || null;
+  }
+
+  async canUserAccessBot(userId: number, botId: number, requiredRole?: string): Promise<boolean> {
+    const userRole = await this.getUserRole(userId, botId);
+    if (!userRole) return false;
+
+    if (!requiredRole) return true;
+
+    const roleHierarchy = ["viewer", "editor", "admin", "owner"];
+    const userRoleIndex = roleHierarchy.indexOf(userRole);
+    const requiredRoleIndex = roleHierarchy.indexOf(requiredRole);
+
+    return userRoleIndex >= requiredRoleIndex;
   }
 }
 
