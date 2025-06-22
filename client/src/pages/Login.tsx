@@ -17,10 +17,17 @@ export default function Login() {
   const { toast } = useToast();
 
   // Check if user is already authenticated
-  const { data: user } = useQuery({
+  const { data: user, error } = useQuery({
     queryKey: ["/api/auth/me"],
     retry: false,
   });
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user && !error) {
+      setLocation("/dashboard");
+    }
+  }, [user, error, setLocation]);
 
   const devLogin = useMutation({
     mutationFn: async (password: string) => {

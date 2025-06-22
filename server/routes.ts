@@ -160,15 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const session = (req as any).session;
       
       if (!session?.userId) {
-        // Return dev user for development when no session
-        return res.json({
-          id: 1,
-          username: "Developer",
-          discriminator: "0001",
-          avatar: null,
-          email: "developer@db14.dev",
-          guilds: [],
-        });
+        return res.status(401).json({ message: "Not authenticated" });
       }
 
       const user = await storage.getUser(session.userId);
@@ -201,7 +193,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/logout", (req, res) => {
-    (req as any).session = null;
+    const session = (req as any).session;
+    if (session) {
+      (req as any).session = null;
+    }
     res.json({ message: "Logged out successfully" });
   });
 
