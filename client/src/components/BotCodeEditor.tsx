@@ -24,8 +24,15 @@ interface CodeBlock {
   color: string;
   inputs?: { name: string; value: string; placeholder: string; type?: 'text' | 'number' | 'select' | 'user' }[];
   options?: string[];
-  connections?: string[];
+  connections?: string[]; // IDs of blocks this block connects to
+  connectedFrom?: string[]; // IDs of blocks that connect to this block
   category: string;
+  position?: { x: number; y: number };
+}
+
+interface Connection {
+  from: string;
+  to: string;
 }
 
 const blockCategories = {
@@ -53,12 +60,25 @@ const blockCategories = {
   ],
   commands: [
     {
-      id: 'basic-command',
+      id: 'command-trigger',
       type: 'command' as const,
-      title: 'Basic Command',
+      title: 'Command Trigger',
       content: '',
       icon: MessageCircle,
       color: 'bg-blue-600',
+      category: 'Commands',
+      inputs: [
+        { name: 'command', value: '!modban', placeholder: 'Command trigger (e.g., !modban)', type: 'text' as const }
+      ],
+      connections: []
+    },
+    {
+      id: 'simple-command',
+      type: 'command' as const,
+      title: 'Simple Command',
+      content: '',
+      icon: MessageCircle,
+      color: 'bg-sky-600',
       category: 'Commands',
       inputs: [
         { name: 'command', value: '!ping', placeholder: 'Command trigger', type: 'text' as const },
@@ -68,7 +88,7 @@ const blockCategories = {
   ],
   moderation: [
     {
-      id: 'ban-user',
+      id: 'ban-action',
       type: 'moderation' as const,
       title: 'Ban User',
       content: '',
@@ -76,13 +96,12 @@ const blockCategories = {
       color: 'bg-red-600',
       category: 'Moderation',
       inputs: [
-        { name: 'command', value: '!ban', placeholder: 'Ban command', type: 'text' as const },
         { name: 'reason', value: 'No reason provided', placeholder: 'Ban reason', type: 'text' as const },
         { name: 'deleteMessages', value: '7', placeholder: 'Days of messages to delete', type: 'number' as const }
       ]
     },
     {
-      id: 'unban-user',
+      id: 'unban-action',
       type: 'moderation' as const,
       title: 'Unban User',
       content: '',
@@ -90,12 +109,11 @@ const blockCategories = {
       color: 'bg-orange-600',
       category: 'Moderation',
       inputs: [
-        { name: 'command', value: '!unban', placeholder: 'Unban command', type: 'text' as const },
         { name: 'reason', value: 'Appeal approved', placeholder: 'Unban reason', type: 'text' as const }
       ]
     },
     {
-      id: 'timeout-user',
+      id: 'timeout-action',
       type: 'moderation' as const,
       title: 'Timeout/Mute User',
       content: '',
@@ -103,13 +121,12 @@ const blockCategories = {
       color: 'bg-yellow-600',
       category: 'Moderation',
       inputs: [
-        { name: 'command', value: '!timeout', placeholder: 'Timeout command', type: 'text' as const },
         { name: 'duration', value: '10', placeholder: 'Duration in minutes', type: 'number' as const },
         { name: 'reason', value: 'No reason provided', placeholder: 'Timeout reason', type: 'text' as const }
       ]
     },
     {
-      id: 'untimeout-user',
+      id: 'untimeout-action',
       type: 'moderation' as const,
       title: 'Remove Timeout',
       content: '',
@@ -117,12 +134,11 @@ const blockCategories = {
       color: 'bg-green-600',
       category: 'Moderation',
       inputs: [
-        { name: 'command', value: '!untimeout', placeholder: 'Untimeout command', type: 'text' as const },
         { name: 'reason', value: 'Timeout removed', placeholder: 'Reason', type: 'text' as const }
       ]
     },
     {
-      id: 'kick-user',
+      id: 'kick-action',
       type: 'moderation' as const,
       title: 'Kick User',
       content: '',
@@ -130,7 +146,6 @@ const blockCategories = {
       color: 'bg-purple-600',
       category: 'Moderation',
       inputs: [
-        { name: 'command', value: '!kick', placeholder: 'Kick command', type: 'text' as const },
         { name: 'reason', value: 'No reason provided', placeholder: 'Kick reason', type: 'text' as const }
       ]
     }
@@ -251,12 +266,25 @@ const blockCategories = {
 
 const defaultBlocks: CodeBlock[] = [
   blockCategories.events[0], // Bot Ready
-  blockCategories.commands[0] // Basic Command
+  {
+    ...blockCategories.commands[0], // Command Trigger
+    position: { x: 100, y: 200 }
+  },
+  {
+    ...blockCategories.moderation[0], // Ban Action
+    id: 'default-ban',
+    position: { x: 400, y: 200 }
+  }
 ];
+
+// Initialize connections
+defaultBlocks[1].connections = ['default-ban'];
+defaultBlocks[2].connectedFrom = [defaultBlocks[1].id];
 
 export function BotCodeEditor({ bot, onSave }: BotCodeEditorProps) {
   const [blocks, setBlocks] = useState<CodeBlock[]>(defaultBlocks);
   const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
+  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [botName, setBotName] = useState(bot?.name || "");
   const [botToken, setBotToken] = useState(bot?.token || "");
   const [showToken, setShowToken] = useState(false);
@@ -330,27 +358,52 @@ function hasPermission(member, permission) {
   
 `;
 
-    // Process each block type
+    // Process command blocks and their connected actions
     blocks.forEach(block => {
       if (block.type === 'command') {
         const command = block.inputs?.find(i => i.name === 'command')?.value || '!ping';
-        const response = block.inputs?.find(i => i.name === 'response')?.value || 'Hello!';
         const commandName = command.startsWith('!') ? command.slice(1) : command;
-        generatedCode += `  if (command === '${commandName}') {
+        
+        // Check if this is a simple command with response
+        const response = block.inputs?.find(i => i.name === 'response')?.value;
+        
+        if (response) {
+          // Simple command with direct response
+          generatedCode += `  if (command === '${commandName}') {
     message.reply('${response}');
   }
   
 `;
+        } else if (block.connections && block.connections.length > 0) {
+          // Command with connected actions
+          generatedCode += `  if (command === '${commandName}') {
+`;
+          
+          // Process all connected blocks
+          block.connections.forEach(connectionId => {
+            const connectedBlock = blocks.find(b => b.id === connectionId);
+            if (connectedBlock) {
+              generatedCode += generateActionCode(connectedBlock);
+            }
+          });
+          
+          generatedCode += `  }
+  
+`;
+        }
       }
 
+    });
+
+    // Helper function to generate action code
+    function generateActionCode(block: CodeBlock): string {
+      let actionCode = '';
+      
       if (block.type === 'moderation') {
-        const commandInput = block.inputs?.find(i => i.name === 'command')?.value || '!ban';
-        const commandName = commandInput.startsWith('!') ? commandInput.slice(1) : commandInput;
-        
-        if (block.id === 'ban-user') {
+        if (block.id?.includes('ban-action')) {
           const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'No reason provided';
           const deleteMessages = block.inputs?.find(i => i.name === 'deleteMessages')?.value || '7';
-          generatedCode += `  if (command === '${commandName}') {
+          actionCode = `    // Ban user action
     if (!hasPermission(message.member, 'BAN_MEMBERS')) {
       return message.reply('❌ You need the Ban Members permission to use this command!');
     }
@@ -373,14 +426,12 @@ function hasPermission(member, permission) {
     } catch (error) {
       message.reply('❌ Failed to ban user. Check my permissions and role hierarchy.');
     }
-  }
-  
 `;
         }
 
-        if (block.id === 'unban-user') {
+        if (block.id?.includes('unban-action')) {
           const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'Appeal approved';
-          generatedCode += `  if (command === '${commandName}') {
+          actionCode = `    // Unban user action
     if (!hasPermission(message.member, 'BAN_MEMBERS')) {
       return message.reply('❌ You need the Ban Members permission to use this command!');
     }
@@ -396,15 +447,13 @@ function hasPermission(member, permission) {
     } catch (error) {
       message.reply('❌ Failed to unban user. They may not be banned or I lack permissions.');
     }
-  }
-  
 `;
         }
 
-        if (block.id === 'timeout-user') {
+        if (block.id?.includes('timeout-action')) {
           const duration = block.inputs?.find(i => i.name === 'duration')?.value || '10';
           const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'No reason provided';
-          generatedCode += `  if (command === '${commandName}') {
+          actionCode = `    // Timeout user action
     if (!hasPermission(message.member, 'MODERATE_MEMBERS')) {
       return message.reply('❌ You need the Moderate Members permission to use this command!');
     }
@@ -425,42 +474,12 @@ function hasPermission(member, permission) {
     } catch (error) {
       message.reply('❌ Failed to timeout user. Check my permissions and role hierarchy.');
     }
-  }
-  
 `;
         }
 
-        if (block.id === 'untimeout-user') {
-          const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'Timeout removed';
-          generatedCode += `  if (command === '${commandName}') {
-    if (!hasPermission(message.member, 'MODERATE_MEMBERS')) {
-      return message.reply('❌ You need the Moderate Members permission to use this command!');
-    }
-    
-    const target = await getTargetUser(message, args);
-    if (!target) {
-      return message.reply('❌ Please mention a user or provide a valid user ID.');
-    }
-    
-    const member = message.guild.members.cache.get(target.id);
-    if (!member) {
-      return message.reply('❌ User not found in this server.');
-    }
-    
-    try {
-      await member.timeout(null, '${reason}');
-      message.reply(\`✅ Successfully removed timeout from \${target.tag}\`);
-    } catch (error) {
-      message.reply('❌ Failed to remove timeout. Check my permissions.');
-    }
-  }
-  
-`;
-        }
-
-        if (block.id === 'kick-user') {
+        if (block.id?.includes('kick-action')) {
           const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'No reason provided';
-          generatedCode += `  if (command === '${commandName}') {
+          actionCode = `    // Kick user action
     if (!hasPermission(message.member, 'KICK_MEMBERS')) {
       return message.reply('❌ You need the Kick Members permission to use this command!');
     }
@@ -481,12 +500,21 @@ function hasPermission(member, permission) {
     } catch (error) {
       message.reply('❌ Failed to kick user. Check my permissions and role hierarchy.');
     }
-  }
-  
 `;
         }
       }
-    });
+      
+      if (block.type === 'action') {
+        if (block.id?.includes('send-message')) {
+          const content = block.inputs?.find(i => i.name === 'content')?.value || 'Hello World!';
+          actionCode = `    // Send message action
+    message.channel.send('${content}');
+`;
+        }
+      }
+      
+      return actionCode;
+    }
 
     generatedCode += `});
 
@@ -540,9 +568,36 @@ client.login(process.env.DISCORD_TOKEN);`;
   const addNewBlock = (blockTemplate: CodeBlock) => {
     const newBlock: CodeBlock = {
       ...blockTemplate,
-      id: `block-${Date.now()}`
+      id: `block-${Date.now()}`,
+      connections: [],
+      connectedFrom: [],
+      position: { x: Math.random() * 300 + 100, y: Math.random() * 200 + 100 }
     };
     setBlocks(prev => [...prev, newBlock]);
+  };
+
+  const connectBlocks = (fromId: string, toId: string) => {
+    setBlocks(prev => prev.map(block => {
+      if (block.id === fromId) {
+        return { ...block, connections: [...(block.connections || []), toId] };
+      }
+      if (block.id === toId) {
+        return { ...block, connectedFrom: [...(block.connectedFrom || []), fromId] };
+      }
+      return block;
+    }));
+  };
+
+  const disconnectBlocks = (fromId: string, toId: string) => {
+    setBlocks(prev => prev.map(block => {
+      if (block.id === fromId) {
+        return { ...block, connections: (block.connections || []).filter(id => id !== toId) };
+      }
+      if (block.id === toId) {
+        return { ...block, connectedFrom: (block.connectedFrom || []).filter(id => id !== fromId) };
+      }
+      return block;
+    }));
   };
 
   const deleteBlock = (blockId: string) => {
@@ -696,10 +751,26 @@ client.login(process.env.DISCORD_TOKEN);`;
                               onDragStart={() => handleDragStart(block.id)}
                               onDragOver={(e) => handleDragOver(e, block.id)}
                               onDrop={handleDrop}
-                              onClick={() => setSelectedBlock(block.id)}
+                              onClick={() => {
+                                if (connectingFrom && connectingFrom !== block.id) {
+                                  // Complete connection
+                                  connectBlocks(connectingFrom, block.id);
+                                  setConnectingFrom(null);
+                                  toast({
+                                    title: "Blocks connected",
+                                    description: "Successfully connected the blocks!"
+                                  });
+                                } else {
+                                  setSelectedBlock(block.id);
+                                }
+                              }}
                               className={`relative group cursor-move p-4 rounded-lg border-2 transition-all ${
                                 selectedBlock === block.id 
                                   ? 'border-blue-500 bg-[#2f3136]' 
+                                  : connectingFrom === block.id
+                                  ? 'border-green-500 bg-[#2f3136] animate-pulse'
+                                  : connectingFrom && block.connectedFrom?.length === 0 && block.type !== 'event' && block.type !== 'command'
+                                  ? 'border-yellow-500 bg-[#2f3136] hover:border-yellow-400'
                                   : 'border-[#40444b] bg-[#36393f] hover:border-[#5865f2]'
                               }`}
                             >
@@ -710,6 +781,39 @@ client.login(process.env.DISCORD_TOKEN);`;
                                 <div className="flex-1">
                                   <h4 className="text-white font-medium">{block.title}</h4>
                                   <p className="text-[#b9bbbe] text-sm">{block.type.charAt(0).toUpperCase() + block.type.slice(1)} Block</p>
+                                  
+                                  {/* Show connections */}
+                                  {block.connections && block.connections.length > 0 && (
+                                    <div className="mt-2">
+                                      <p className="text-xs text-[#8a92b2]">Connected to:</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {block.connections.map(connId => {
+                                          const connectedBlock = blocks.find(b => b.id === connId);
+                                          return (
+                                            <Badge key={connId} variant="secondary" className="text-xs">
+                                              {connectedBlock?.title || 'Unknown'}
+                                            </Badge>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {block.connectedFrom && block.connectedFrom.length > 0 && (
+                                    <div className="mt-2">
+                                      <p className="text-xs text-[#8a92b2]">Triggered by:</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {block.connectedFrom.map(connId => {
+                                          const connectedBlock = blocks.find(b => b.id === connId);
+                                          return (
+                                            <Badge key={connId} variant="outline" className="text-xs">
+                                              {connectedBlock?.title || 'Unknown'}
+                                            </Badge>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
                                   
                                   {block.inputs && block.inputs.length > 0 && (
                                     <div className="mt-3 space-y-2">
@@ -743,17 +847,42 @@ client.login(process.env.DISCORD_TOKEN);`;
                                     </div>
                                   )}
                                 </div>
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteBlock(block.id);
-                                  }}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <div className="flex flex-col gap-1">
+                                  {(block.type === 'command' || block.type === 'condition') && (
+                                    <Button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (connectingFrom === block.id) {
+                                          setConnectingFrom(null);
+                                        } else {
+                                          setConnectingFrom(block.id);
+                                          toast({
+                                            title: "Connection mode",
+                                            description: "Click on another block to connect them!"
+                                          });
+                                        }
+                                      }}
+                                      variant="ghost"
+                                      size="sm"
+                                      className={`opacity-0 group-hover:opacity-100 transition-opacity text-green-400 hover:text-green-300 ${
+                                        connectingFrom === block.id ? 'opacity-100 bg-green-600' : ''
+                                      }`}
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteBlock(block.id);
+                                    }}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           );
