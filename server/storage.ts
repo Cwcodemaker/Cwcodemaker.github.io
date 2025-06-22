@@ -124,9 +124,13 @@ export class MemStorage implements IStorage {
       ...insertBot,
       avatar: insertBot.avatar ?? null,
       isOnline: insertBot.isOnline ?? false,
+      isDeployed: false,
       serverCount: insertBot.serverCount ?? 0,
       commandCount: insertBot.commandCount ?? 0,
+      lastHeartbeat: null,
+      deploymentUrl: null,
       lastSeen: null,
+      updatedAt: new Date(),
       createdAt: new Date()
     };
     this.bots.set(bot.id, bot);

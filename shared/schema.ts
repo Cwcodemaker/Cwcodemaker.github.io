@@ -21,12 +21,18 @@ export const bots = pgTable("bots", {
   userId: integer("user_id").references(() => users.id).notNull(),
   botId: text("bot_id").notNull().unique(),
   name: text("name").notNull(),
+  description: text("description"),
   avatar: text("avatar"),
   token: text("token").notNull(),
+  code: text("code"), // Generated bot code
   isOnline: boolean("is_online").default(false).notNull(),
+  isDeployed: boolean("is_deployed").default(false).notNull(),
   serverCount: integer("server_count").default(0).notNull(),
   commandCount: integer("command_count").default(0).notNull(),
+  lastHeartbeat: timestamp("last_heartbeat"),
+  deploymentUrl: text("deployment_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   lastSeen: timestamp("last_seen"),
 });
 

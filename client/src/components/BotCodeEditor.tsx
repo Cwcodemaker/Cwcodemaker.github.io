@@ -534,6 +534,79 @@ client.login(process.env.DISCORD_TOKEN);`;
     });
   };
 
+  const handleDeploy = async () => {
+    try {
+      const code = generateCodeFromBlocks();
+      
+      if (!botToken) {
+        toast({
+          title: "Token Required",
+          description: "Please enter your Discord bot token before deploying.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const response = await fetch(`/api/bots/${bot?.id}/deploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+
+      if (response.ok) {
+        setIsRunning(true);
+        toast({
+          title: "Bot Deployed!",
+          description: "Your bot is now running 24/7 on our servers.",
+        });
+        addLog("Bot deployed successfully to 24/7 hosting");
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Deployment Failed",
+          description: error.message || "Failed to deploy bot",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Deployment Error",
+        description: "An error occurred while deploying the bot",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleStopBot = async () => {
+    try {
+      const response = await fetch(`/api/bots/${bot?.id}/stop`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        setIsRunning(false);
+        toast({
+          title: "Bot Stopped",
+          description: "Your bot has been stopped and is no longer running.",
+        });
+        addLog("Bot stopped from 24/7 hosting");
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Stop Failed",
+          description: error.message || "Failed to stop bot",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Stop Error",
+        description: "An error occurred while stopping the bot",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleStart = () => {
     if (!botToken.trim()) {
       toast({
@@ -923,12 +996,12 @@ client.login(process.env.DISCORD_TOKEN);`;
                   Save Bot
                 </Button>
                 {!isRunning ? (
-                  <Button onClick={handleStart} className="bg-green-600 hover:bg-green-700">
+                  <Button onClick={handleDeploy} className="bg-green-600 hover:bg-green-700">
                     <Play className="w-4 h-4 mr-2" />
-                    Start Bot
+                    Deploy 24/7
                   </Button>
                 ) : (
-                  <Button onClick={handleStop} variant="destructive">
+                  <Button onClick={handleStopBot} variant="destructive">
                     <Square className="w-4 h-4 mr-2" />
                     Stop Bot
                   </Button>

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { botRunner } from "./bot-runner";
 import { insertBotSchema, insertCommandSchema, insertActivitySchema, insertCollaboratorSchema } from "@shared/schema";
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || "";
@@ -277,7 +278,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const bots = await storage.getBotsUserCanAccess(user.id);
-      res.json(bots);
+      
+      // Add runtime status for each bot
+      const botsWithStatus = bots.map(bot => ({
+        ...bot,
+        runtimeStatus: botRunner.getBotStatus(bot.id)
+      }));
+      
+      res.json(botsWithStatus);
     } catch (error) {
       console.error("Error fetching bots:", error);
       res.json([]);

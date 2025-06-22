@@ -117,7 +117,8 @@ The application uses a relational database with the following core tables:
 
 ```
 Changelog:
-- June 22, 2025. Initial setup
+- June 22, 2025. Initial setup with Discord OAuth and visual block editor
+- June 22, 2025. Implemented 24/7 bot hosting system with deployment infrastructure
 ```
 
 ## User Preferences
