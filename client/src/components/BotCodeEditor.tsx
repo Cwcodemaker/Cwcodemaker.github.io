@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Play, Square, Save, FileCode, Terminal, Settings, Key, Eye, EyeOff, ExternalLink, Plus, Trash2, MessageCircle, Users, Zap, Database, Settings2 } from "lucide-react";
+import { Play, Square, Save, FileCode, Terminal, Settings, Key, Eye, EyeOff, ExternalLink, Plus, Trash2, MessageCircle, Users, Zap, Database, Settings2, Shield, UserX, Volume, VolumeX, GitBranch, Filter, Clock, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BotCodeEditorProps {
@@ -17,37 +17,241 @@ interface BotCodeEditorProps {
 // Block types for visual coding
 interface CodeBlock {
   id: string;
-  type: 'event' | 'command' | 'action' | 'condition' | 'variable';
+  type: 'event' | 'command' | 'moderation' | 'condition' | 'logic' | 'variable' | 'action';
   title: string;
   content: string;
   icon: any;
   color: string;
-  inputs?: { name: string; value: string; placeholder: string }[];
+  inputs?: { name: string; value: string; placeholder: string; type?: 'text' | 'number' | 'select' | 'user' }[];
+  options?: string[];
   connections?: string[];
+  category: string;
 }
 
+const blockCategories = {
+  events: [
+    {
+      id: 'ready-event',
+      type: 'event' as const,
+      title: 'Bot Ready',
+      content: 'client.once("ready", () => {\n  console.log(`Bot is online!`);\n});',
+      icon: Zap,
+      color: 'bg-green-600',
+      category: 'Events',
+      inputs: []
+    },
+    {
+      id: 'message-event',
+      type: 'event' as const,
+      title: 'Message Event',
+      content: 'client.on("messageCreate", async (message) => {\n  // Handle message\n});',
+      icon: MessageCircle,
+      color: 'bg-green-600',
+      category: 'Events',
+      inputs: []
+    }
+  ],
+  commands: [
+    {
+      id: 'basic-command',
+      type: 'command' as const,
+      title: 'Basic Command',
+      content: '',
+      icon: MessageCircle,
+      color: 'bg-blue-600',
+      category: 'Commands',
+      inputs: [
+        { name: 'command', value: '!ping', placeholder: 'Command trigger', type: 'text' as const },
+        { name: 'response', value: 'Pong!', placeholder: 'Bot response', type: 'text' as const }
+      ]
+    }
+  ],
+  moderation: [
+    {
+      id: 'ban-user',
+      type: 'moderation' as const,
+      title: 'Ban User',
+      content: '',
+      icon: Shield,
+      color: 'bg-red-600',
+      category: 'Moderation',
+      inputs: [
+        { name: 'command', value: '!ban', placeholder: 'Ban command', type: 'text' as const },
+        { name: 'reason', value: 'No reason provided', placeholder: 'Ban reason', type: 'text' as const },
+        { name: 'deleteMessages', value: '7', placeholder: 'Days of messages to delete', type: 'number' as const }
+      ]
+    },
+    {
+      id: 'unban-user',
+      type: 'moderation' as const,
+      title: 'Unban User',
+      content: '',
+      icon: UserX,
+      color: 'bg-orange-600',
+      category: 'Moderation',
+      inputs: [
+        { name: 'command', value: '!unban', placeholder: 'Unban command', type: 'text' as const },
+        { name: 'reason', value: 'Appeal approved', placeholder: 'Unban reason', type: 'text' as const }
+      ]
+    },
+    {
+      id: 'timeout-user',
+      type: 'moderation' as const,
+      title: 'Timeout/Mute User',
+      content: '',
+      icon: Volume,
+      color: 'bg-yellow-600',
+      category: 'Moderation',
+      inputs: [
+        { name: 'command', value: '!timeout', placeholder: 'Timeout command', type: 'text' as const },
+        { name: 'duration', value: '10', placeholder: 'Duration in minutes', type: 'number' as const },
+        { name: 'reason', value: 'No reason provided', placeholder: 'Timeout reason', type: 'text' as const }
+      ]
+    },
+    {
+      id: 'untimeout-user',
+      type: 'moderation' as const,
+      title: 'Remove Timeout',
+      content: '',
+      icon: VolumeX,
+      color: 'bg-green-600',
+      category: 'Moderation',
+      inputs: [
+        { name: 'command', value: '!untimeout', placeholder: 'Untimeout command', type: 'text' as const },
+        { name: 'reason', value: 'Timeout removed', placeholder: 'Reason', type: 'text' as const }
+      ]
+    },
+    {
+      id: 'kick-user',
+      type: 'moderation' as const,
+      title: 'Kick User',
+      content: '',
+      icon: UserX,
+      color: 'bg-purple-600',
+      category: 'Moderation',
+      inputs: [
+        { name: 'command', value: '!kick', placeholder: 'Kick command', type: 'text' as const },
+        { name: 'reason', value: 'No reason provided', placeholder: 'Kick reason', type: 'text' as const }
+      ]
+    }
+  ],
+  conditions: [
+    {
+      id: 'if-condition',
+      type: 'condition' as const,
+      title: 'If Statement',
+      content: '',
+      icon: GitBranch,
+      color: 'bg-cyan-600',
+      category: 'Logic',
+      inputs: [
+        { name: 'condition', value: 'message.member.permissions.has("ADMINISTRATOR")', placeholder: 'Condition to check', type: 'text' as const },
+        { name: 'trueAction', value: 'message.reply("You have admin permissions!")', placeholder: 'Action if true', type: 'text' as const },
+        { name: 'falseAction', value: 'message.reply("You need admin permissions!")', placeholder: 'Action if false', type: 'text' as const }
+      ]
+    },
+    {
+      id: 'permission-check',
+      type: 'condition' as const,
+      title: 'Permission Check',
+      content: '',
+      icon: Shield,
+      color: 'bg-indigo-600',
+      category: 'Logic',
+      inputs: [
+        { name: 'permission', value: 'BAN_MEMBERS', placeholder: 'Permission to check', type: 'select' as const },
+        { name: 'errorMessage', value: 'You need permission to use this command!', placeholder: 'Error message', type: 'text' as const }
+      ],
+      options: ['ADMINISTRATOR', 'BAN_MEMBERS', 'KICK_MEMBERS', 'MANAGE_MESSAGES', 'MANAGE_ROLES', 'MANAGE_CHANNELS', 'MODERATE_MEMBERS']
+    },
+    {
+      id: 'role-check',
+      type: 'condition' as const,
+      title: 'Role Check',
+      content: '',
+      icon: Star,
+      color: 'bg-pink-600',
+      category: 'Logic',
+      inputs: [
+        { name: 'roleName', value: 'Moderator', placeholder: 'Role name to check', type: 'text' as const },
+        { name: 'errorMessage', value: 'You need the required role!', placeholder: 'Error message', type: 'text' as const }
+      ]
+    }
+  ],
+  logic: [
+    {
+      id: 'and-gate',
+      type: 'logic' as const,
+      title: 'AND Gate',
+      content: '',
+      icon: Filter,
+      color: 'bg-teal-600',
+      category: 'Logic Gates',
+      inputs: [
+        { name: 'condition1', value: 'message.member.permissions.has("BAN_MEMBERS")', placeholder: 'First condition', type: 'text' as const },
+        { name: 'condition2', value: 'message.member.roles.cache.has("moderatorRoleId")', placeholder: 'Second condition', type: 'text' as const }
+      ]
+    },
+    {
+      id: 'or-gate',
+      type: 'logic' as const,
+      title: 'OR Gate',
+      content: '',
+      icon: GitBranch,
+      color: 'bg-amber-600',
+      category: 'Logic Gates',
+      inputs: [
+        { name: 'condition1', value: 'message.member.permissions.has("ADMINISTRATOR")', placeholder: 'First condition', type: 'text' as const },
+        { name: 'condition2', value: 'message.author.id === "YOUR_USER_ID"', placeholder: 'Second condition', type: 'text' as const }
+      ]
+    }
+  ],
+  actions: [
+    {
+      id: 'send-message',
+      type: 'action' as const,
+      title: 'Send Message',
+      content: '',
+      icon: MessageCircle,
+      color: 'bg-blue-500',
+      category: 'Actions',
+      inputs: [
+        { name: 'channel', value: 'message.channel', placeholder: 'Channel to send to', type: 'text' as const },
+        { name: 'content', value: 'Hello World!', placeholder: 'Message content', type: 'text' as const }
+      ]
+    },
+    {
+      id: 'add-role',
+      type: 'action' as const,
+      title: 'Add Role',
+      content: '',
+      icon: Star,
+      color: 'bg-emerald-600',
+      category: 'Actions',
+      inputs: [
+        { name: 'roleName', value: 'Member', placeholder: 'Role name to add', type: 'text' as const },
+        { name: 'successMessage', value: 'Role added successfully!', placeholder: 'Success message', type: 'text' as const }
+      ]
+    },
+    {
+      id: 'remove-role',
+      type: 'action' as const,
+      title: 'Remove Role',
+      content: '',
+      icon: UserX,
+      color: 'bg-red-500',
+      category: 'Actions',
+      inputs: [
+        { name: 'roleName', value: 'Member', placeholder: 'Role name to remove', type: 'text' as const },
+        { name: 'successMessage', value: 'Role removed successfully!', placeholder: 'Success message', type: 'text' as const }
+      ]
+    }
+  ]
+};
+
 const defaultBlocks: CodeBlock[] = [
-  {
-    id: 'ready-event',
-    type: 'event',
-    title: 'Bot Ready',
-    content: 'client.once("ready", () => {\n  console.log(`Bot is online!`);\n});',
-    icon: Zap,
-    color: 'bg-green-600',
-    inputs: []
-  },
-  {
-    id: 'ping-command',
-    type: 'command',
-    title: 'Ping Command',
-    content: 'if (message.content === "!ping") {\n  message.reply("Pong!");\n}',
-    icon: MessageCircle,
-    color: 'bg-blue-600',
-    inputs: [
-      { name: 'command', value: '!ping', placeholder: 'Command trigger' },
-      { name: 'response', value: 'Pong!', placeholder: 'Bot response' }
-    ]
-  }
+  blockCategories.events[0], // Bot Ready
+  blockCategories.commands[0] // Basic Command
 ];
 
 export function BotCodeEditor({ bot, onSave }: BotCodeEditorProps) {
@@ -68,38 +272,219 @@ export function BotCodeEditor({ bot, onSave }: BotCodeEditorProps) {
 
   const generateCodeFromBlocks = useCallback(() => {
     let generatedCode = `// Generated Discord Bot Code
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, PermissionFlagsBits } = require('discord.js');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildModeration,
   ],
 });
 
 `;
 
+    // Add event blocks
     blocks.forEach(block => {
       if (block.type === 'event') {
-        generatedCode += block.content + '\n\n';
+        if (block.id === 'ready-event') {
+          generatedCode += `client.once('ready', () => {
+  console.log(\`✅ \${client.user.tag} is now online!\`);
+  client.user.setActivity('Powered by DB 14', { type: 'WATCHING' });
+});
+
+`;
+        }
       }
     });
 
+    // Helper functions for moderation
+    generatedCode += `// Helper function to get mentioned user or user by ID
+async function getTargetUser(message, args) {
+  let target = message.mentions.users.first();
+  if (!target && args[0]) {
+    try {
+      target = await client.users.fetch(args[0]);
+    } catch (error) {
+      return null;
+    }
+  }
+  return target;
+}
+
+// Helper function to check permissions
+function hasPermission(member, permission) {
+  return member.permissions.has(PermissionFlagsBits[permission]);
+}
+
+`;
+
     generatedCode += `client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
+  if (!message.guild) return;
+  
+  const args = message.content.slice(1).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
   
 `;
 
+    // Process each block type
     blocks.forEach(block => {
       if (block.type === 'command') {
         const command = block.inputs?.find(i => i.name === 'command')?.value || '!ping';
         const response = block.inputs?.find(i => i.name === 'response')?.value || 'Hello!';
-        generatedCode += `  if (message.content === '${command}') {
+        const commandName = command.startsWith('!') ? command.slice(1) : command;
+        generatedCode += `  if (command === '${commandName}') {
     message.reply('${response}');
   }
   
 `;
+      }
+
+      if (block.type === 'moderation') {
+        const commandInput = block.inputs?.find(i => i.name === 'command')?.value || '!ban';
+        const commandName = commandInput.startsWith('!') ? commandInput.slice(1) : commandInput;
+        
+        if (block.id === 'ban-user') {
+          const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'No reason provided';
+          const deleteMessages = block.inputs?.find(i => i.name === 'deleteMessages')?.value || '7';
+          generatedCode += `  if (command === '${commandName}') {
+    if (!hasPermission(message.member, 'BAN_MEMBERS')) {
+      return message.reply('❌ You need the Ban Members permission to use this command!');
+    }
+    
+    const target = await getTargetUser(message, args);
+    if (!target) {
+      return message.reply('❌ Please mention a user or provide a valid user ID.');
+    }
+    
+    if (target.id === message.author.id) {
+      return message.reply('❌ You cannot ban yourself!');
+    }
+    
+    try {
+      await message.guild.members.ban(target.id, {
+        reason: '${reason}',
+        deleteMessageDays: ${deleteMessages}
+      });
+      message.reply(\`✅ Successfully banned \${target.tag} for: ${reason}\`);
+    } catch (error) {
+      message.reply('❌ Failed to ban user. Check my permissions and role hierarchy.');
+    }
+  }
+  
+`;
+        }
+
+        if (block.id === 'unban-user') {
+          const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'Appeal approved';
+          generatedCode += `  if (command === '${commandName}') {
+    if (!hasPermission(message.member, 'BAN_MEMBERS')) {
+      return message.reply('❌ You need the Ban Members permission to use this command!');
+    }
+    
+    const userId = args[0];
+    if (!userId) {
+      return message.reply('❌ Please provide a user ID to unban.');
+    }
+    
+    try {
+      await message.guild.members.unban(userId, '${reason}');
+      message.reply(\`✅ Successfully unbanned user ID: \${userId}\`);
+    } catch (error) {
+      message.reply('❌ Failed to unban user. They may not be banned or I lack permissions.');
+    }
+  }
+  
+`;
+        }
+
+        if (block.id === 'timeout-user') {
+          const duration = block.inputs?.find(i => i.name === 'duration')?.value || '10';
+          const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'No reason provided';
+          generatedCode += `  if (command === '${commandName}') {
+    if (!hasPermission(message.member, 'MODERATE_MEMBERS')) {
+      return message.reply('❌ You need the Moderate Members permission to use this command!');
+    }
+    
+    const target = await getTargetUser(message, args);
+    if (!target) {
+      return message.reply('❌ Please mention a user or provide a valid user ID.');
+    }
+    
+    const member = message.guild.members.cache.get(target.id);
+    if (!member) {
+      return message.reply('❌ User not found in this server.');
+    }
+    
+    try {
+      await member.timeout(${duration} * 60 * 1000, '${reason}');
+      message.reply(\`✅ Successfully timed out \${target.tag} for ${duration} minutes. Reason: ${reason}\`);
+    } catch (error) {
+      message.reply('❌ Failed to timeout user. Check my permissions and role hierarchy.');
+    }
+  }
+  
+`;
+        }
+
+        if (block.id === 'untimeout-user') {
+          const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'Timeout removed';
+          generatedCode += `  if (command === '${commandName}') {
+    if (!hasPermission(message.member, 'MODERATE_MEMBERS')) {
+      return message.reply('❌ You need the Moderate Members permission to use this command!');
+    }
+    
+    const target = await getTargetUser(message, args);
+    if (!target) {
+      return message.reply('❌ Please mention a user or provide a valid user ID.');
+    }
+    
+    const member = message.guild.members.cache.get(target.id);
+    if (!member) {
+      return message.reply('❌ User not found in this server.');
+    }
+    
+    try {
+      await member.timeout(null, '${reason}');
+      message.reply(\`✅ Successfully removed timeout from \${target.tag}\`);
+    } catch (error) {
+      message.reply('❌ Failed to remove timeout. Check my permissions.');
+    }
+  }
+  
+`;
+        }
+
+        if (block.id === 'kick-user') {
+          const reason = block.inputs?.find(i => i.name === 'reason')?.value || 'No reason provided';
+          generatedCode += `  if (command === '${commandName}') {
+    if (!hasPermission(message.member, 'KICK_MEMBERS')) {
+      return message.reply('❌ You need the Kick Members permission to use this command!');
+    }
+    
+    const target = await getTargetUser(message, args);
+    if (!target) {
+      return message.reply('❌ Please mention a user or provide a valid user ID.');
+    }
+    
+    const member = message.guild.members.cache.get(target.id);
+    if (!member) {
+      return message.reply('❌ User not found in this server.');
+    }
+    
+    try {
+      await member.kick('${reason}');
+      message.reply(\`✅ Successfully kicked \${target.tag} for: ${reason}\`);
+    } catch (error) {
+      message.reply('❌ Failed to kick user. Check my permissions and role hierarchy.');
+    }
+  }
+  
+`;
+        }
       }
     });
 
@@ -152,18 +537,10 @@ client.login(process.env.DISCORD_TOKEN);`;
     setLogs(prev => [...prev.slice(-49), `[${new Date().toLocaleTimeString()}] ${message}`]);
   };
 
-  const addNewBlock = (type: CodeBlock['type']) => {
+  const addNewBlock = (blockTemplate: CodeBlock) => {
     const newBlock: CodeBlock = {
-      id: `block-${Date.now()}`,
-      type,
-      title: type === 'command' ? 'New Command' : type === 'event' ? 'New Event' : 'New Action',
-      content: '',
-      icon: type === 'command' ? MessageCircle : type === 'event' ? Zap : Settings2,
-      color: type === 'command' ? 'bg-blue-600' : type === 'event' ? 'bg-green-600' : 'bg-purple-600',
-      inputs: type === 'command' ? [
-        { name: 'command', value: '!newcommand', placeholder: 'Command trigger' },
-        { name: 'response', value: 'Hello!', placeholder: 'Bot response' }
-      ] : []
+      ...blockTemplate,
+      id: `block-${Date.now()}`
     };
     setBlocks(prev => [...prev, newBlock]);
   };
@@ -274,34 +651,36 @@ client.login(process.env.DISCORD_TOKEN);`;
               {viewMode === 'blocks' ? (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-[500px]">
                   {/* Block Palette */}
-                  <div className="lg:col-span-1 space-y-4">
-                    <h3 className="text-white font-medium">Add Blocks</h3>
-                    <div className="space-y-2">
-                      <Button
-                        onClick={() => addNewBlock('event')}
-                        className="w-full justify-start bg-green-600 hover:bg-green-700"
-                        size="sm"
-                      >
-                        <Zap className="w-4 h-4 mr-2" />
-                        Event Block
-                      </Button>
-                      <Button
-                        onClick={() => addNewBlock('command')}
-                        className="w-full justify-start bg-blue-600 hover:bg-blue-700"
-                        size="sm"
-                      >
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        Command Block
-                      </Button>
-                      <Button
-                        onClick={() => addNewBlock('action')}
-                        className="w-full justify-start bg-purple-600 hover:bg-purple-700"
-                        size="sm"
-                      >
-                        <Settings2 className="w-4 h-4 mr-2" />
-                        Action Block
-                      </Button>
-                    </div>
+                  <div className="lg:col-span-1">
+                    <ScrollArea className="h-[500px] pr-4">
+                      <div className="space-y-4">
+                        <h3 className="text-white font-medium">Block Palette</h3>
+                        
+                        {Object.entries(blockCategories).map(([categoryKey, categoryBlocks]) => (
+                          <div key={categoryKey} className="space-y-2">
+                            <h4 className="text-sm font-medium text-[#b9bbbe] uppercase tracking-wide">
+                              {categoryBlocks[0]?.category}
+                            </h4>
+                            <div className="space-y-1">
+                              {categoryBlocks.map((blockTemplate) => {
+                                const IconComponent = blockTemplate.icon;
+                                return (
+                                  <Button
+                                    key={blockTemplate.id}
+                                    onClick={() => addNewBlock(blockTemplate)}
+                                    className={`w-full justify-start text-xs ${blockTemplate.color} hover:opacity-80`}
+                                    size="sm"
+                                  >
+                                    <IconComponent className="w-3 h-3 mr-2" />
+                                    {blockTemplate.title}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
                   </div>
 
                   {/* Block Canvas */}
@@ -336,14 +715,29 @@ client.login(process.env.DISCORD_TOKEN);`;
                                     <div className="mt-3 space-y-2">
                                       {block.inputs.map((input) => (
                                         <div key={input.name}>
-                                          <Label className="text-xs text-[#b9bbbe] capitalize">{input.name}</Label>
-                                          <Input
-                                            value={input.value}
-                                            onChange={(e) => updateBlockInput(block.id, input.name, e.target.value)}
-                                            placeholder={input.placeholder}
-                                            className="mt-1 bg-[#40444b] border-[#4f545c] text-white text-sm"
-                                            size="sm"
-                                          />
+                                          <Label className="text-xs text-[#b9bbbe] capitalize">
+                                            {input.name.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                                          </Label>
+                                          {input.type === 'select' && block.options ? (
+                                            <select
+                                              value={input.value}
+                                              onChange={(e) => updateBlockInput(block.id, input.name, e.target.value)}
+                                              className="mt-1 w-full bg-[#40444b] border border-[#4f545c] text-white text-sm rounded px-2 py-1"
+                                            >
+                                              {block.options.map(option => (
+                                                <option key={option} value={option}>{option}</option>
+                                              ))}
+                                            </select>
+                                          ) : (
+                                            <Input
+                                              value={input.value}
+                                              onChange={(e) => updateBlockInput(block.id, input.name, e.target.value)}
+                                              placeholder={input.placeholder}
+                                              type={input.type === 'number' ? 'number' : 'text'}
+                                              className="mt-1 bg-[#40444b] border-[#4f545c] text-white text-sm"
+                                              size="sm"
+                                            />
+                                          )}
                                         </div>
                                       ))}
                                     </div>
