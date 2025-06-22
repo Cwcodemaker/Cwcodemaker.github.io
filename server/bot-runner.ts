@@ -28,10 +28,15 @@ class BotRunner {
   async startBot(botId: number): Promise<boolean> {
     try {
       const bot = await storage.getBot(botId);
-      if (!bot || !bot.token || !bot.code) {
-        console.error(`Bot ${botId}: Missing token or code`);
+      if (!bot || !bot.token) {
+        console.error(`Bot ${botId}: Missing token`);
         return false;
       }
+
+      // Generate default code if none exists
+      const defaultCode = bot.code || this.generateDefaultBotCode();
+      
+      console.log(`Starting bot ${botId}: ${bot.name} with token: ${bot.token.substring(0, 10)}...`);
 
       // Stop existing instance if running
       if (this.runningBots.has(botId)) {
@@ -60,10 +65,12 @@ class BotRunner {
       writeFileSync(packageFile, JSON.stringify(packageJson, null, 2));
 
       // Write bot code with token injection
-      const botCode = bot.code.replace('process.env.DISCORD_TOKEN', `"${bot.token}"`);
+      const botCode = defaultCode.replace('process.env.DISCORD_TOKEN', `"${bot.token}"`);
       const wrappedCode = `
-// Auto-generated Discord bot
+// Auto-generated Discord bot for ${bot.name}
 const { Client, GatewayIntentBits, PermissionFlagsBits } = require('discord.js');
+
+console.log('Starting Discord bot: ${bot.name}');
 
 // Heartbeat function
 setInterval(() => {
@@ -154,6 +161,63 @@ ${botCode}
       console.error(`Failed to start bot ${botId}:`, error);
       return false;
     }
+  }
+
+  private generateDefaultBotCode(): string {
+    return `// Generated Discord Bot Code
+const { Client, GatewayIntentBits, PermissionFlagsBits } = require('discord.js');
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildModeration,
+  ],
+});
+
+client.once('ready', () => {
+  console.log(\`✅ \${client.user.tag} is now online!\`);
+  client.user.setActivity('Powered by DB 14', { type: 'WATCHING' });
+});
+
+// Helper function to get mentioned user or user by ID
+async function getTargetUser(message, args) {
+  let target = message.mentions.users.first();
+  if (!target && args[0]) {
+    try {
+      target = await client.users.fetch(args[0]);
+    } catch (error) {
+      return null;
+    }
+  }
+  return target;
+}
+
+// Helper function to check permissions
+function hasPermission(member, permission) {
+  return member.permissions.has(PermissionFlagsBits[permission]);
+}
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  if (!message.guild) return;
+  
+  const args = message.content.slice(1).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
+  
+  if (command === 'ping') {
+    message.reply('Pong! Bot is online and running 24/7 on DB 14!');
+  }
+  
+  if (command === 'help') {
+    message.reply('🤖 **Available Commands:**\\n\`!ping\` - Check if bot is online\\n\`!help\` - Show this help message\\n\\nThis bot is hosted 24/7 on DB 14!');
+  }
+  
+});
+
+client.login(process.env.DISCORD_TOKEN);`;
   }
 
   async stopBot(botId: number): Promise<boolean> {

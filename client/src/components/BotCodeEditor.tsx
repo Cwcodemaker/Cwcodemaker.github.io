@@ -575,10 +575,13 @@ client.login(process.env.DISCORD_TOKEN);`;
         return;
       }
 
+      // First save the bot with the current code and token
+      await handleSave();
+
       const response = await fetch(`/api/bots/${bot?.id}/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
+        body: JSON.stringify({ code, token: botToken })
       });
 
       if (response.ok) {
@@ -588,6 +591,7 @@ client.login(process.env.DISCORD_TOKEN);`;
           description: "Your bot is now running 24/7 on our servers.",
         });
         addLog("Bot deployed successfully to 24/7 hosting");
+        addLog("Bot is now online and responding to commands");
       } else {
         const error = await response.json();
         toast({
@@ -595,6 +599,7 @@ client.login(process.env.DISCORD_TOKEN);`;
           description: error.message || "Failed to deploy bot",
           variant: "destructive"
         });
+        addLog(`Deployment failed: ${error.message || "Unknown error"}`);
       }
     } catch (error) {
       toast({
@@ -602,6 +607,7 @@ client.login(process.env.DISCORD_TOKEN);`;
         description: "An error occurred while deploying the bot",
         variant: "destructive"
       });
+      addLog("Deployment error occurred");
     }
   };
 
