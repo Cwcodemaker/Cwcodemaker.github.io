@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Play, Square, Save, FileCode, Terminal, Settings } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Play, Square, Save, FileCode, Terminal, Settings, Key, Eye, EyeOff, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BotCodeEditorProps {
@@ -71,6 +72,7 @@ export function BotCodeEditor({ bot, onSave }: BotCodeEditorProps) {
   const [code, setCode] = useState(bot?.code || defaultBotCode);
   const [botName, setBotName] = useState(bot?.name || "");
   const [botToken, setBotToken] = useState(bot?.token || "");
+  const [showToken, setShowToken] = useState(false);
   const [isRunning, setIsRunning] = useState(bot?.isOnline || false);
   const [logs, setLogs] = useState<string[]>([
     "Bot editor initialized",
@@ -166,12 +168,38 @@ export function BotCodeEditor({ bot, onSave }: BotCodeEditorProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="Enter your Discord bot code here..."
-                className="min-h-[400px] bg-[#40444b] border-[#4f545c] text-white font-mono text-sm"
-              />
+              {/* Block-style Code Editor */}
+              <div className="bg-[#1e1f22] border border-[#40444b] rounded-lg overflow-hidden">
+                <div className="bg-[#2f3136] px-4 py-2 border-b border-[#40444b] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span className="text-[#b9bbbe] text-sm ml-3">index.js</span>
+                  </div>
+                  <div className="text-xs text-[#b9bbbe]">JavaScript</div>
+                </div>
+                <div className="relative">
+                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-[#282a2e] border-r border-[#40444b] flex flex-col text-[#6d7075] text-xs font-mono">
+                    {code.split('\n').map((_, index) => (
+                      <div key={index} className="px-2 py-0.5 text-right leading-6">
+                        {index + 1}
+                      </div>
+                    ))}
+                  </div>
+                  <Textarea
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Enter your Discord bot code here..."
+                    className="min-h-[500px] pl-16 pr-4 py-3 bg-transparent border-none text-[#d4d4d4] font-mono text-sm leading-6 resize-none focus:ring-0 focus:outline-none"
+                    style={{ 
+                      fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, "Courier New", monospace',
+                      fontSize: '14px',
+                      lineHeight: '24px'
+                    }}
+                  />
+                </div>
+              </div>
               <div className="flex gap-2">
                 <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
                   <Save className="w-4 h-4 mr-2" />
@@ -225,6 +253,51 @@ export function BotCodeEditor({ bot, onSave }: BotCodeEditorProps) {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
+          {/* Bot Setup Guide */}
+          {!botToken && (
+            <Card className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-blue-500/50">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Key className="w-6 h-6 text-blue-400" />
+                  <h3 className="text-lg font-semibold text-white">Setup Your Discord Bot</h3>
+                </div>
+                <p className="text-[#b9bbbe] mb-4">
+                  Follow these simple steps to get your bot token and start hosting your Discord bot:
+                </p>
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                    <div>
+                      <p className="text-white font-medium">Visit Discord Developer Portal</p>
+                      <p className="text-sm text-[#b9bbbe]">Go to discord.com/developers/applications</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                    <div>
+                      <p className="text-white font-medium">Create New Application</p>
+                      <p className="text-sm text-[#b9bbbe]">Click "New Application" and give it a name</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">3</div>
+                    <div>
+                      <p className="text-white font-medium">Get Your Bot Token</p>
+                      <p className="text-sm text-[#b9bbbe]">Go to "Bot" section and copy the token</p>
+                    </div>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => window.open('https://discord.com/developers/applications', '_blank')}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open Discord Developer Portal
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-[#2f3136] border-[#40444b]">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
@@ -235,30 +308,62 @@ export function BotCodeEditor({ bot, onSave }: BotCodeEditorProps) {
                 Configure your Discord bot settings and token
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="botName" className="text-white">Bot Name</Label>
                 <Input
                   id="botName"
                   value={botName}
                   onChange={(e) => setBotName(e.target.value)}
-                  placeholder="Enter your bot name"
+                  placeholder="My Awesome Bot"
                   className="bg-[#40444b] border-[#4f545c] text-white"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="botToken" className="text-white">Discord Bot Token</Label>
-                <Input
-                  id="botToken"
-                  type="password"
-                  value={botToken}
-                  onChange={(e) => setBotToken(e.target.value)}
-                  placeholder="Enter your Discord bot token"
-                  className="bg-[#40444b] border-[#4f545c] text-white"
-                />
-                <p className="text-xs text-[#b9bbbe]">
-                  Get your bot token from the Discord Developer Portal
-                </p>
+              
+              <div className="space-y-3">
+                <Label htmlFor="botToken" className="text-white flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  Discord Bot Token
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="botToken"
+                    type={showToken ? "text" : "password"}
+                    value={botToken}
+                    onChange={(e) => setBotToken(e.target.value)}
+                    placeholder="Paste your bot token here..."
+                    className="bg-[#40444b] border-[#4f545c] text-white pr-12"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1 h-8 w-8 p-0 hover:bg-[#4f545c]"
+                    onClick={() => setShowToken(!showToken)}
+                  >
+                    {showToken ? (
+                      <EyeOff className="w-4 h-4 text-[#b9bbbe]" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-[#b9bbbe]" />
+                    )}
+                  </Button>
+                </div>
+                {botToken && (
+                  <div className="flex items-center gap-2 text-sm text-green-400">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    Token configured successfully
+                  </div>
+                )}
+                <div className="bg-[#40444b] p-3 rounded-lg">
+                  <p className="text-xs text-[#b9bbbe] mb-2">
+                    <strong>Keep your token secure:</strong>
+                  </p>
+                  <ul className="text-xs text-[#b9bbbe] space-y-1">
+                    <li>• Never share your bot token publicly</li>
+                    <li>• Regenerate if compromised</li>
+                    <li>• Only paste from Discord Developer Portal</li>
+                  </ul>
+                </div>
               </div>
             </CardContent>
           </Card>
