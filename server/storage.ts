@@ -141,7 +141,7 @@ export class MemStorage implements IStorage {
     const bot = this.bots.get(id);
     if (!bot) return undefined;
     
-    const updatedBot = { ...bot, ...updates };
+    const updatedBot = { ...bot, ...updates, updatedAt: new Date() };
     this.bots.set(id, updatedBot);
     return updatedBot;
   }

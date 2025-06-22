@@ -13,6 +13,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { CommandTable } from "@/components/CommandTable";
 import { BotCodeEditor } from "@/components/BotCodeEditor";
 import { BotForm } from "@/components/BotForm";
+import { CreateBotButton } from "@/components/CreateBotButton";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { apiRequest } from "@/lib/queryClient";
 import type { User, Bot, ActivityWithBot, Command } from "@shared/schema";
@@ -252,10 +253,7 @@ export default function Dashboard() {
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button className="bg-[#5865f2] hover:bg-[#4f46e5] text-white">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Bot
-            </Button>
+            <CreateBotButton />
           </div>
         </div>
 
@@ -268,10 +266,13 @@ export default function Dashboard() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-white">Your Bots</h2>
-              <Button size="sm" variant="outline">
-                <Code className="h-4 w-4 mr-2" />
-                Code Editor
-              </Button>
+              <div className="flex gap-2">
+                <CreateBotButton />
+                <Button size="sm" variant="outline">
+                  <Code className="h-4 w-4 mr-2" />
+                  Code Editor
+                </Button>
+              </div>
             </div>
             <BotList 
               bots={bots || []} 
@@ -314,6 +315,19 @@ export default function Dashboard() {
           {renderPageContent()}
         </main>
       </div>
+      
+      {/* Create Bot Modal */}
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-[#2f3136] border border-[#40444b] rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-semibold text-white mb-4">Create New Discord Bot</h3>
+            <BotForm 
+              onSubmit={handleCreateBot} 
+              onCancel={() => setShowCreateForm(false)} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
