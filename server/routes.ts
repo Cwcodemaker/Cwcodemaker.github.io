@@ -158,7 +158,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Set session
-      (req as any).session = { userId: user!.id };
+      (req as any).session.userId = user!.id;
+      console.log("Session set with userId:", user!.id);
+      console.log("User created/updated:", { id: user!.id, username: user!.username, email: user!.email });
       
       res.redirect("/dashboard");
     } catch (error) {
@@ -170,6 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/me", async (req, res) => {
     try {
       const session = (req as any).session;
+      console.log("Auth check - session:", session);
       
       if (!session?.userId) {
         return res.status(401).json({ message: "Not authenticated" });
@@ -207,7 +210,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", (req, res) => {
     const session = (req as any).session;
     if (session) {
-      (req as any).session = null;
+      session.destroy((err: any) => {
+        if (err) {
+          console.error("Session destroy error:", err);
+        }
+      });
     }
     res.json({ message: "Logged out successfully" });
   });
