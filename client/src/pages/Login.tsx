@@ -173,7 +173,7 @@ export default function Login() {
               </div>
 
               <p className="text-xs text-[#b9bbbe] text-center">
-                By logging in, you agree to connect your Discord account and allow bot management permissions.
+                Discord login allows secure access to your servers and bot management.
               </p>
             </CardContent>
           </Card>

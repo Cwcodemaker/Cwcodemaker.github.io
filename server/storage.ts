@@ -84,6 +84,8 @@ export class MemStorage implements IStorage {
       id: this.currentUserId++,
       ...insertUser,
       avatar: insertUser.avatar ?? null,
+      email: insertUser.email ?? null,
+      guilds: insertUser.guilds ?? null,
       createdAt: new Date()
     };
     this.users.set(user.id, user);
@@ -548,4 +550,4 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();

@@ -8,9 +8,11 @@ export const users = pgTable("users", {
   discordId: text("discord_id").notNull().unique(),
   username: text("username").notNull(),
   discriminator: text("discriminator").notNull(),
+  email: text("email"),
   avatar: text("avatar"),
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token").notNull(),
+  guilds: text("guilds"), // JSON string of Discord servers/guilds
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

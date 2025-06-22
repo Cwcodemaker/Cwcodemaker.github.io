@@ -6,7 +6,7 @@ import { insertBotSchema, insertCommandSchema, insertActivitySchema, insertColla
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || "";
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || "";
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || "http://localhost:5000/api/auth/callback";
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost:5000"}/api/auth/callback`;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -69,7 +69,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Discord OAuth routes
   app.get("/api/auth/discord", (req, res) => {
     const state = Math.random().toString(36).substring(7);
-    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify%20bot&state=${state}`;
+    const scopes = "identify email guilds";
+    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${state}`;
     res.redirect(discordAuthUrl);
   });
 
@@ -102,14 +103,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("Failed to get access token");
       }
 
-      // Get user info
+      // Fetch user data from Discord
       const userResponse = await fetch("https://discord.com/api/users/@me", {
         headers: {
           Authorization: `Bearer ${tokenData.access_token}`,
         },
       });
-
       const userData = await userResponse.json();
+
+      // Fetch user's guilds (servers)
+      const guildsResponse = await fetch("https://discord.com/api/users/@me/guilds", {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
+      const guildsData = await guildsResponse.json();
 
       // Create or update user
       let user = await storage.getUserByDiscordId(userData.id);
@@ -119,17 +127,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           discordId: userData.id,
           username: userData.username,
           discriminator: userData.discriminator || "0000",
+          email: userData.email,
           avatar: userData.avatar,
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
+          guilds: JSON.stringify(guildsData),
         });
       } else {
         user = await storage.updateUser(user.id, {
           username: userData.username,
           discriminator: userData.discriminator || "0000",
+          email: userData.email,
           avatar: userData.avatar,
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token,
+          guilds: JSON.stringify(guildsData),
         });
       }
 
@@ -144,13 +156,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/auth/me", async (req, res) => {
-    // Return dev user for development
-    res.json({
-      id: 1,
-      username: "Developer",
-      discriminator: "0001",
-      avatar: null,
-    });
+    try {
+      const session = (req as any).session;
+      
+      if (!session?.userId) {
+        // Return dev user for development when no session
+        return res.json({
+          id: 1,
+          username: "Developer",
+          discriminator: "0001",
+          avatar: null,
+          email: "developer@db14.dev",
+          guilds: [],
+        });
+      }
+
+      const user = await storage.getUser(session.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Parse guilds from JSON string
+      let guilds = [];
+      try {
+        guilds = user.guilds ? JSON.parse(user.guilds) : [];
+      } catch (e) {
+        guilds = [];
+      }
+
+      res.json({
+        id: user.id,
+        discordId: user.discordId,
+        username: user.username,
+        discriminator: user.discriminator,
+        email: user.email,
+        avatar: user.avatar,
+        guilds: guilds,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
   });
 
   app.post("/api/auth/logout", (req, res) => {
