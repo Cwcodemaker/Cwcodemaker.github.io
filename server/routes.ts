@@ -6,7 +6,7 @@ import { insertBotSchema, insertCommandSchema, insertActivitySchema, insertColla
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || "";
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || "";
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost:5000"}/api/auth/callback`;
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `https://${process.env.REPLIT_DEV_DOMAIN || 'localhost:5000'}/api/auth/callback`;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -66,15 +66,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Debug route to show redirect URI
+  app.get("/api/auth/redirect-info", (req, res) => {
+    res.json({
+      redirect_uri: DISCORD_REDIRECT_URI,
+      client_id: DISCORD_CLIENT_ID,
+      domain: process.env.REPLIT_DEV_DOMAIN
+    });
+  });
+
   // Discord OAuth routes
   app.get("/api/auth/discord", (req, res) => {
     const state = Math.random().toString(36).substring(7);
     const scopes = "identify email guilds";
     const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scopes)}&state=${state}`;
+    console.log("Discord OAuth URL:", discordAuthUrl);
+    console.log("Redirect URI:", DISCORD_REDIRECT_URI);
     res.redirect(discordAuthUrl);
   });
 
   app.get("/api/auth/callback", async (req, res) => {
+    console.log("OAuth callback received:", req.query);
     const { code } = req.query;
     
     if (!code) {
