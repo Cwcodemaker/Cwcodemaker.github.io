@@ -293,45 +293,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/bots", async (req, res) => {
-    const userId = (req as any).session?.userId;
-    
-    if (!userId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
     try {
-      const validatedData = insertBotSchema.parse({ ...req.body, userId });
+      const session = (req as any).session;
+      if (!session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { name, description, token } = req.body;
       
+      if (!name || !token) {
+        return res.status(400).json({ message: "Name and token are required" });
+      }
+
       // Verify bot token with Discord API
       const botResponse = await fetch("https://discord.com/api/users/@me", {
         headers: {
-          Authorization: `Bot ${validatedData.token}`,
+          Authorization: `Bot ${token}`,
         },
       });
 
       if (!botResponse.ok) {
-        return res.status(400).json({ message: "Invalid bot token" });
+        return res.status(400).json({ message: "Invalid bot token - please check your Discord bot token" });
       }
 
       const botData = await botResponse.json();
       
       const bot = await storage.createBot({
-        ...validatedData,
+        userId: session.userId,
         botId: botData.id,
-        name: botData.username,
+        name: name,
+        description: description || "",
         avatar: botData.avatar,
+        token: token,
+        isOnline: false,
+        serverCount: 0,
+        commandCount: 0
       });
 
       // Create activity
       await storage.createActivity({
         botId: bot.id,
-        type: 'deployment',
-        message: 'Bot was connected successfully'
+        userId: session.userId,
+        type: 'bot_created',
+        description: `Created bot: ${bot.name}`
       });
 
-      res.json(bot);
+      res.status(201).json(bot);
     } catch (error: any) {
-      res.status(400).json({ message: error.message });
+      console.error("Error creating bot:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/bots/:id", async (req, res) => {
+    try {
+      const session = (req as any).session;
+      if (!session?.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const botId = parseInt(req.params.id);
+      const updates = req.body;
+
+      // Check if user can access this bot
+      const canAccess = await storage.canUserAccessBot(session.userId, botId, "admin");
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedBot = await storage.updateBot(botId, updates);
+      if (!updatedBot) {
+        return res.status(404).json({ message: "Bot not found" });
+      }
+
+      res.json(updatedBot);
+    } catch (error) {
+      console.error("Failed to update bot:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

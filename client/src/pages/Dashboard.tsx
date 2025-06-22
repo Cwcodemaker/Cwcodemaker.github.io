@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Plus, Code } from "lucide-react";
+import { RefreshCw, Plus, Code, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Navigation } from "@/components/Navigation";
@@ -11,12 +12,14 @@ import { BotList } from "@/components/BotList";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { CommandTable } from "@/components/CommandTable";
 import { BotCodeEditor } from "@/components/BotCodeEditor";
+import { BotForm } from "@/components/BotForm";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { apiRequest } from "@/lib/queryClient";
 import type { User, Bot, ActivityWithBot, Command } from "@shared/schema";
 
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [location] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -48,6 +51,27 @@ export default function Dashboard() {
   useWebSocket(user?.id?.toString() || null);
 
   // Mutations
+  const createBotMutation = useMutation({
+    mutationFn: async (botData: any) => {
+      return apiRequest("POST", "/api/bots", botData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bots"] });
+      setShowCreateForm(false);
+      toast({
+        title: "Bot created",
+        description: "Your Discord bot has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create bot",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteBotMutation = useMutation({
     mutationFn: async (botId: number) => {
       return apiRequest("DELETE", `/api/bots/${botId}`);
@@ -60,6 +84,10 @@ export default function Dashboard() {
       });
     },
   });
+
+  const handleCreateBot = async (formData: any) => {
+    createBotMutation.mutate(formData);
+  };
 
   const handleRefresh = () => {
     queryClient.invalidateQueries();
@@ -119,9 +147,12 @@ export default function Dashboard() {
               <h1 className="text-3xl font-bold text-white">Bot Commands</h1>
               <p className="text-[#b9bbbe] mt-2">Manage and configure your bot commands</p>
             </div>
-            <Button className="bg-[#5865f2] hover:bg-[#4f46e5] text-white">
+            <Button 
+              onClick={() => setShowCreateForm(true)}
+              className="bg-[#5865f2] hover:bg-[#4f46e5] text-white"
+            >
               <Plus className="h-4 w-4 mr-2" />
-              Add Command
+              Create Bot
             </Button>
           </div>
           

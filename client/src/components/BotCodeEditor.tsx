@@ -523,15 +523,43 @@ client.login(process.env.DISCORD_TOKEN);`;
     return generatedCode;
   }, [blocks]);
 
-  const handleSave = () => {
-    const code = generateCodeFromBlocks();
-    if (onSave) {
-      onSave(code);
+  const handleSave = async () => {
+    try {
+      const code = generateCodeFromBlocks();
+      
+      // Auto-save bot data
+      const response = await fetch(`/api/bots/${bot?.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: botName,
+          token: botToken,
+          code: code
+        })
+      });
+
+      if (response.ok) {
+        if (onSave) {
+          onSave(code);
+        }
+        toast({
+          title: "Bot saved",
+          description: "Your bot has been saved successfully.",
+        });
+      } else {
+        toast({
+          title: "Save failed",
+          description: "Failed to save bot changes.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Save error",
+        description: "An error occurred while saving.",
+        variant: "destructive"
+      });
     }
-    toast({
-      title: "Bot saved",
-      description: "Your bot blocks have been saved successfully.",
-    });
   };
 
   const handleDeploy = async () => {
