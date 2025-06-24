@@ -49,9 +49,10 @@ export interface IStorage {
   getBotCollaborators(botId: number): Promise<CollaboratorWithUser[]>;
   getBotsUserCanAccess(userId: number): Promise<BotWithCollaborators[]>;
   inviteCollaborator(collaboration: InsertCollaborator): Promise<Collaborator>;
-  acceptCollaboratorInvite(collaboratorId: number): Promise<Collaborator | undefined>;
+  acceptCollaboratorInvite(collaboratorIdString: string): Promise<Collaborator | undefined>;
   removeCollaborator(collaboratorId: number): Promise<boolean>;
   updateCollaboratorRole(collaboratorId: number, role: string): Promise<Collaborator | undefined>;
+  generateCollaboratorId(serverId: string, userId: number): Promise<string>;
   getUserRole(userId: number, botId: number): Promise<string | null>;
   canUserAccessBot(userId: number, botId: number, requiredRole?: string): Promise<boolean>;
 }
