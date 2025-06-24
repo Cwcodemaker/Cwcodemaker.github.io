@@ -119,10 +119,24 @@ The application uses a relational database with the following core tables:
 Changelog:
 - June 22, 2025. Initial setup with Discord OAuth and visual block editor
 - June 22, 2025. Implemented 24/7 bot hosting system with deployment infrastructure
+- June 24, 2025. Added collaborator system with serverid-userid-8randomchars format
+- June 24, 2025. Created production deployment guide and Docker configuration
 ```
 
 ## User Preferences
 
 ```
 Preferred communication style: Simple, everyday language.
+Deployment preference: Personal machine hosting with custom domain.
 ```
+
+## Deployment Information
+
+The platform includes comprehensive deployment documentation:
+- Production deployment script with automated setup
+- Docker containerization support
+- Nginx reverse proxy configuration
+- SSL certificate setup with Let's Encrypt
+- PM2 process management
+- Database backup strategies
+- Security hardening guidelines
